@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>SEAE - Sistema de Evaluación Económica</title>
+    
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#4a8eff",
+                        "secondary-container": "#00a572",
+                        "surface-container": "#1c2027",
+                        "surface-container-low": "#181c23",
+                        "secondary": "#4edea3",
+                        "on-surface-variant": "#c1c6d7",
+                        "background": "#10131b"
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #10131b; color: #e0e2ed; font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2C2C2C; border-radius: 10px; }
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="antialiased overflow-hidden">
+
+    <aside class="fixed left-0 top-0 h-full w-64 border-r border-neutral-800 bg-neutral-900 flex flex-col z-50">
+        <div class="p-6">
+            <h1 class="text-2xl font-black tracking-tighter text-white">SEAE</h1>
+            <p class="text-xs text-neutral-400">Financial Evaluation</p>
+        </div>
+        <nav class="flex-1 px-2 space-y-1 mt-4">
+            <a class="flex items-center gap-3 px-4 py-2 rounded text-blue-500 border-r-2 border-blue-500 bg-neutral-800/50 font-semibold" href="#">
+                <span class="material-symbols-outlined">add_chart</span>
+                <span class="text-sm">Nueva Evaluación</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2 rounded text-neutral-400 hover:bg-neutral-800/30" href="#">
+                <span class="material-symbols-outlined">history</span>
+                <span class="text-sm">Historial</span>
+            </a>
+        </nav>
+        <div class="p-6 border-t border-neutral-800">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-neutral-400 text-sm">person</span>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold text-white">Analista Senior</p>
+                    <p class="text-[9px] text-neutral-500">ID: #882193-FX</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="ml-64 mr-72 mt-4 p-8 overflow-y-auto h-[calc(100vh-1rem)] custom-scrollbar">
+        <div class="mb-10 flex justify-between items-end">
+            <div>
+                <h2 class="text-3xl font-bold text-white">Nueva Evaluación</h2>
+                <p class="text-neutral-400 text-sm">Configure los parámetros de inversión para el análisis comparativo.</p>
+            </div>
+            <button onclick="ejecutarSimulacion()" class="bg-secondary-container text-white px-6 py-3 rounded-lg font-bold hover:brightness-110 transition-all flex items-center gap-2">
+                <span class="material-symbols-outlined">play_arrow</span>
+                EJECUTAR CÁLCULOS
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-10">
+            <div class="bg-surface-container-low border border-neutral-800 p-6 rounded-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-neutral-800 pb-3">
+                    <span class="w-2 h-6 bg-primary-container rounded-full"></span>
+                    <h3 class="text-xl font-bold text-white">Alternativa A</h3>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-1">Inversión Inicial ($)</label>
+                            <input id="inv_a" type="number" class="w-full bg-neutral-950 border-neutral-800 rounded text-white font-mono text-sm" value="150000">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-1">Tasa de Descuento (%)</label>
+                            <input id="tasa_a" type="number" class="w-full bg-neutral-950 border-neutral-800 rounded text-white font-mono text-sm" value="12">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-2">Flujos de Efectivo Anuales</label>
+                        <div class="grid grid-cols-5 gap-2">
+                            <input class="f_a w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="45000">
+                            <input class="f_a w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="48500">
+                            <input class="f_a w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="52000">
+                            <input class="f_a w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="55500">
+                            <input class="f_a w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="60000">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-surface-container-low border border-neutral-800 p-6 rounded-xl">
+                <div class="flex items-center gap-3 mb-6 border-b border-neutral-800 pb-3">
+                    <span class="w-2 h-6 bg-secondary rounded-full"></span>
+                    <h3 class="text-xl font-bold text-white">Alternativa B</h3>
+                </div>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-1">Inversión Inicial ($)</label>
+                            <input id="inv_b" type="number" class="w-full bg-neutral-950 border-neutral-800 rounded text-white font-mono text-sm" value="185000">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-1">Tasa de Descuento (%)</label>
+                            <input id="tasa_b" type="number" class="w-full bg-neutral-950 border-neutral-800 rounded text-white font-mono text-sm" value="12">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-neutral-500 uppercase mb-2">Flujos de Efectivo Anuales</label>
+                        <div class="grid grid-cols-5 gap-2">
+                            <input class="f_b w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="">
+                            <input class="f_b w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="">
+                            <input class="f_b w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="">
+                            <input class="f_b w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="">
+                            <input class="f_b w-full bg-neutral-950 border-neutral-800 rounded text-xs p-2 text-center" type="number" value="">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="space-y-6">
+            <h3 class="text-white font-bold text-lg">Cálculos Económicos Realizados</h3>
+            <div class="grid grid-cols-3 gap-6">
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">VPN Alt A</span>
+                    <div id="res_vpn_a" class="text-2xl font-bold text-primary-container">$0.00</div>
+                </div>
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg border-l-4 border-l-secondary">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">VPN Alt B</span>
+                    <div id="res_vpn_b" class="text-2xl font-bold text-secondary">$0.00</div>
+                </div>
+                <div class="bg-neutral-800/20 border border-neutral-800 p-5 rounded-lg flex items-center">
+                    <p id="recomendacion_txt" class="text-xs text-neutral-300 italic">Ejecute los cálculos para ver la recomendación...</p>
+                </div>
+
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">CAE A</span>
+                    <div id="res_cae_a" class="text-xl font-bold text-white">$0.00</div>
+                </div>
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">CAE B</span>
+                    <div id="res_cae_b" class="text-xl font-bold text-white">$0.00</div>
+                </div>
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">Mejor Opción (CAE)</span>
+                    <div id="res_mejor_cae" class="text-xl font-bold text-white">-</div>
+                </div>
+
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">TIR A</span>
+                    <div id="res_tir_a" class="text-xl font-bold text-white">0%</div>
+                </div>
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+                    <span class="text-[10px] text-neutral-500 font-bold uppercase">TIR B</span>
+                    <div id="res_tir_b" class="text-xl font-bold text-white">0%</div>
+                </div>
+                <div class="bg-surface-container border border-neutral-800 p-5 rounded-lg">
+    <span class="text-[10px] text-neutral-500 font-bold uppercase">Estado</span>
+    <div id="estado_sistema" class="text-sm font-bold text-neutral-500 flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">pending</span> PENDIENTE
+    </div>
+
+     </div>
+            </div>
+        </section>
+    </main>
+
+    <aside class="fixed right-0 top-0 h-full w-72 bg-neutral-900 border-l border-neutral-800 p-6 z-50">
+        <h2 class="font-bold text-white text-lg mb-6">Generar Reportes</h2>
+        
+        <div class="space-y-3">
+            <button onclick="exportarPDF()" class="w-full flex items-center justify-between p-4 bg-neutral-800/50 border border-neutral-800 rounded-lg hover:bg-neutral-800 hover:text-white transition-all group">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-red-400">picture_as_pdf</span>
+                    <span class="text-xs font-medium">Exportar PDF</span>
+                </div>
+                <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">download</span>
+            </button>
+
+            <button onclick="exportarExcel()" class="w-full flex items-center justify-between p-4 bg-neutral-800/50 border border-neutral-800 rounded-lg hover:bg-neutral-800 hover:text-white transition-all group">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-green-400">table_view</span>
+                    <span class="text-xs font-medium">Exportar Excel</span>
+                </div>
+                <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">download</span>
+            </button>
+
+            <button onclick="exportarTXT()" class="w-full flex items-center justify-between p-4 bg-neutral-800/50 border border-neutral-800 rounded-lg hover:bg-neutral-800 hover:text-white transition-all group">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-blue-400">description</span>
+                    <span class="text-xs font-medium">Archivo Texto</span>
+                </div>
+                <span class="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">download</span>
+            </button>
+        </div>
+
+        <div class="mt-12">
+    <h4 class="text-[10px] font-bold text-neutral-500 uppercase mb-4">Resumen Visual</h4>
+    <div class="h-32 flex items-end justify-around gap-4 px-2">
+        
+        <div class="flex-1 bg-primary-container/10 rounded-t-md relative h-full">
+            <div id="bar_a" 
+                 class="w-full bg-primary-container rounded-t-md transition-all duration-700 absolute bottom-0 shadow-[0_0_15px_rgba(74,142,255,0.3)]" 
+                 style="height: 0%;">
+            </div>
+            <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold text-neutral-500">ALT A</span>
+        </div>
+
+        <div class="flex-1 bg-secondary/10 rounded-t-md relative h-full">
+            <div id="bar_b" 
+                 class="w-full bg-secondary rounded-t-md transition-all duration-700 absolute bottom-0 shadow-[0_0_15px_rgba(78,222,163,0.3)]" 
+                 style="height: 0%;">
+            </div>
+            <span class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold text-neutral-500">ALT B</span>
+        </div>
+
+    </div>
+</div>
+    </aside>
+
+    <script src="script.js"></script>
+    <link rel="manifest" href="manifest.json">
+</body>
+</html>
