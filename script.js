@@ -240,4 +240,41 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
   });
 }
+window.onload = function() {
+    // Busca todos los inputs de tipo número y texto y los vacía
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.value = '';
+    });
+    
+    // Si tienes etiquetas de resultados (VPN, CAE, TIR), cámbialas a su valor inicial
+    document.getElementById('res_vpn_a').innerText = '$0.00';
+    document.getElementById('res_vpn_b').innerText = '$0.00';
+    // Repite con los demás resultados...
+    
+    console.log("Sistema SEAE reiniciado.");
+};
 
+function limpiarPantalla() {
+    // 1. Limpiar los cuadros de entrada
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => input.value = '');
+
+    // 2. Reiniciar textos de resultados
+    const resultados = ['res_vpn_a', 'res_vpn_b', 'res_cae_a', 'res_cae_b', 'res_tir_a', 'res_tir_b'];
+    resultados.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = id.includes('tir') ? '0.00%' : '$0.00';
+    });
+
+    // 3. ELIMINAR LAS BARRAS (El fix que faltaba)
+    document.getElementById('bar_a').style.height = '0%';
+    document.getElementById('bar_b').style.height = '0%';
+
+    // 4. Reiniciar textos informativos
+    document.getElementById('res_mejor_cae').innerText = 'Indiferente';
+    document.getElementById('recomendacion_txt').innerText = 'Esperando nuevos datos...';
+    document.getElementById('estado_sistema').innerHTML = 'SISTEMA LISTO';
+    
+    console.log("Limpieza total completada.");
+}
