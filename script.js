@@ -130,49 +130,67 @@ function ejecutarSimulacion() {
     }, 600); 
 }
     
-// --- 3. EXPORTACIONES ---
+// --- 3. EXPORTACIONES (VERSIÓN COMPATIBLE CON ESCRITORIO) ---
+
+/**
+ * Función auxiliar para forzar la descarga en entornos restringidos
+ */
+function forzarDescarga(blob, nombreArchivo) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = nombreArchivo;
+    
+    // Es vital agregar el elemento al DOM para que Nativefier lo reconozca
+    document.body.appendChild(a);
+    a.click();
+    
+    // Limpieza
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
 
 function exportarExcel() {
     const data = [
-        ["REPORTE SEAE"],
+        ["REPORTE SEAE - SISTEMA DE EVALUACIÓN ECONÓMICA"],
+        ["Fecha:", new Date().toLocaleDateString()],
+        [],
         ["Métrica", "Alternativa A", "Alternativa B"],
         ["VPN", document.getElementById('res_vpn_a').innerText, document.getElementById('res_vpn_b').innerText],
         ["CAE", document.getElementById('res_cae_a').innerText, document.getElementById('res_cae_b').innerText],
         ["TIR", document.getElementById('res_tir_a').innerText, document.getElementById('res_tir_b').innerText]
     ];
+    
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Resultados");
-    XLSX.writeFile(wb, "Reporte_Financiero.xlsx");
+    
+    // Generamos los datos en memoria primero
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    forzarDescarga(blob, "Reporte_Financiero_SEAE.xlsx");
 }
 
 function exportarPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
-    // Recuperamos el nombre real de Google
     const nombreAnalista = localStorage.getItem('usuarioSEAE') || "Analista Independiente";
 
-    // --- ENCABEZADO GRIS ---
+    // --- Diseño del PDF ---
     doc.setFontSize(26);
-    doc.setTextColor(45, 52, 54); // Gris muy oscuro
+    doc.setTextColor(45, 52, 54);
     doc.setFont("helvetica", "bold");
     doc.text("SEAE", 14, 22);
     
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100); 
     doc.text("Sistema de Evaluación de Alternativas Económicas", 14, 30);
-    
-    doc.setDrawColor(200, 200, 200);
     doc.line(14, 35, 196, 35);
 
-    // DATOS DINÁMICOS
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 42);
-    doc.text(`Analista: ${nombreAnalista}`, 14, 47);
-
-    // --- TABLA MONOCROMÁTICA ---
     doc.autoTable({
         startY: 55,
         head: [['Métrica de Evaluación', 'Alternativa A', 'Alternativa B']],
@@ -182,41 +200,23 @@ function exportarPDF() {
             ['Tasa Interna de Retorno (TIR)', document.getElementById('res_tir_a').innerText, document.getElementById('res_tir_b').innerText]
         ],
         theme: 'striped',
-        headStyles: { 
-            fillColor: [45, 52, 54], // Gris oscuro profesional
-            textColor: [255, 255, 255]
-        },
-        styles: { textColor: [60, 60, 60], fontSize: 10 }
+        headStyles: { fillColor: [45, 52, 54] }
     });
 
-    // --- CONCLUSIÓN (SIEMPRE GRIS) ---
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
-    doc.setTextColor(45, 52, 54);
-    doc.setFont("helvetica", "bold");
-    doc.text("Conclusión del Análisis:", 14, finalY);
-
-    doc.setFontSize(11);
-    doc.setTextColor(80, 80, 80); // Gris estándar para el texto
-    doc.setFont("helvetica", "italic");
-    
-    const recomendacionTxt = document.getElementById('recomendacion_txt').innerText;
-    const splitTxt = doc.splitTextToSize(recomendacionTxt, 180);
-    doc.text(splitTxt, 14, finalY + 8);
-
-    doc.save(`Reporte_SEAE_${nombreAnalista.replace(/ /g, "_")}.pdf`);
+    // En lugar de doc.save, generamos el blob para usar nuestra función de fuerza
+    const pdfBlob = doc.output('blob');
+    forzarDescarga(pdfBlob, `Reporte_SEAE_${nombreAnalista.replace(/ /g, "_")}.pdf`);
 }
 
 function exportarTXT() {
     const vpnA = document.getElementById('res_vpn_a').innerText;
     const vpnB = document.getElementById('res_vpn_b').innerText;
-    const content = `REPORTE SEAE\n----------------\nALT A VPN: ${vpnA}\nALT B VPN: ${vpnB}`;
+    const reco = document.getElementById('recomendacion_txt').innerText;
+    
+    const content = `REPORTE SEAE\nFECHA: ${new Date().toLocaleDateString()}\n${'-'.repeat(20)}\nALT A VPN: ${vpnA}\nALT B VPN: ${vpnB}\n${'-'.repeat(20)}\nCONCLUSIÓN: ${reco}`;
     
     const blob = new Blob([content], {type: 'text/plain'});
-    const url = URL.createObjectURL(blob);
-    
-    // En lugar de a.click(), abrimos el blob directamente
-    window.open(url, '_blank'); 
+    forzarDescarga(blob, "Reporte_Simulacion.txt");
 }
 // Actualización del Resumen Visual
 const vpnA = parseFloat(document.getElementById('res_vpn_a').innerText.replace(/[^0-9.-]+/g,""));
