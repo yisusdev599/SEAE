@@ -211,11 +211,12 @@ function exportarTXT() {
     const vpnA = document.getElementById('res_vpn_a').innerText;
     const vpnB = document.getElementById('res_vpn_b').innerText;
     const content = `REPORTE SEAE\n----------------\nALT A VPN: ${vpnA}\nALT B VPN: ${vpnB}`;
+    
     const blob = new Blob([content], {type: 'text/plain'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = "reporte.txt";
-    a.click();
+    const url = URL.createObjectURL(blob);
+    
+    // En lugar de a.click(), abrimos el blob directamente
+    window.open(url, '_blank'); 
 }
 // Actualización del Resumen Visual
 const vpnA = parseFloat(document.getElementById('res_vpn_a').innerText.replace(/[^0-9.-]+/g,""));
