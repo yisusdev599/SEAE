@@ -168,31 +168,55 @@ function exportarExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Resultados");
     
-    // Generamos los datos en memoria primero
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    
-    forzarDescarga(blob, "Reporte_Financiero_SEAE.xlsx");
+    // Volvemos al método directo de la librería
+    XLSX.writeFile(wb, "Reporte_Financiero_SEAE.xlsx");
 }
 
 function exportarPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const nombreAnalista = localStorage.getItem('usuarioSEAE') || "Analista Independiente";
 
-    // --- Diseño del PDF ---
-    doc.setFontSize(26);
-    doc.setTextColor(45, 52, 54);
+    // 1. OBTENCIÓN DE DATOS ACTUALES
+    // Obtenemos el nombre del analista del localStorage o usamos el valor predeterminado de la interfaz
+    const nombreAnalista = localStorage.getItem('usuarioSEAE') || document.getElementById('nombre_analista_principal')?.innerText || "Analista Independiente";
+    const fechaEmision = new Date().toLocaleDateString('es-ES');
+    
+    // Obtenemos la recomendación actual de la interfaz
+    const conclusion = document.getElementById('recomendacion_txt').innerText;
+
+    // --- CONFIGURACIÓN DE ESTILOS DE FUENTE ---
+    doc.setFont("helvetica");
+
+    // === ENCABEZADO PRINCIPAL (SEAE) ===
+    doc.setFontSize(30);
+    doc.setTextColor(28, 32, 39); // Un gris muy oscuro, casi negro
     doc.setFont("helvetica", "bold");
-    doc.text("SEAE", 14, 22);
+    doc.text("SEAE", 16, 25);
     
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100); 
-    doc.text("Sistema de Evaluación de Alternativas Económicas", 14, 30);
-    doc.line(14, 35, 196, 35);
+    doc.setTextColor(110, 110, 110); // Gris para el subtítulo
+    doc.setFont("helvetica", "normal");
+    doc.text("Sistema de Evaluación de Alternativas Económicas", 16, 33);
+    
+    // Línea divisoria horizontal gris claro
+    doc.setDrawColor(210, 210, 210);
+    doc.line(16, 38, 194, 38);
 
+    // === SECCIÓN DE METADATOS (Fecha y Analista) ===
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont("helvetica", "bold");
+    doc.text("Fecha de emisión:", 16, 50);
+    doc.text("Analista:", 16, 56);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(fechaEmision, 50, 50);
+    doc.text(nombreAnalista, 35, 56);
+
+    // === TABLA DE RESULTADOS (Using autoTable) ===
     doc.autoTable({
-        startY: 55,
+        startY: 65,
+        margin: { left: 16, right: 16 },
         head: [['Métrica de Evaluación', 'Alternativa A', 'Alternativa B']],
         body: [
             ['Valor Presente Neto (VPN)', document.getElementById('res_vpn_a').innerText, document.getElementById('res_vpn_b').innerText],
@@ -200,12 +224,46 @@ function exportarPDF() {
             ['Tasa Interna de Retorno (TIR)', document.getElementById('res_tir_a').innerText, document.getElementById('res_tir_b').innerText]
         ],
         theme: 'striped',
-        headStyles: { fillColor: [45, 52, 54] }
+        headStyles: { 
+            fillColor: [40, 45, 53], // Gris oscuro de la cabecera
+            textColor: [255, 255, 255], 
+            fontStyle: 'bold',
+            halign: 'left' // Alineación a la izquierda para la primera columna
+        },
+        bodyStyles: { 
+            textColor: [60, 60, 60],
+            valign: 'middle'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 251] // Gris muy claro para filas alternas
+        },
+        columnStyles: {
+            1: { halign: 'right' }, // Alternativa A a la derecha
+            2: { halign: 'right' }  // Alternativa B a la derecha
+        }
     });
 
-    // En lugar de doc.save, generamos el blob para usar nuestra función de fuerza
-    const pdfBlob = doc.output('blob');
-    forzarDescarga(pdfBlob, `Reporte_SEAE_${nombreAnalista.replace(/ /g, "_")}.pdf`);
+    // === SECCIÓN DE CONCLUSIÓN (Debajo de la tabla) ===
+    // Obtenemos la coordenada Y donde terminó la tabla
+    const finalY = doc.lastAutoTable.finalY;
+
+    doc.setFontSize(12);
+    doc.setTextColor(28, 32, 39);
+    doc.setFont("helvetica", "bold");
+    doc.text("Conclusión del Análisis:", 16, finalY + 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont("helvetica", "italic");
+    
+    // Usamos textWithLink o splitTextToSize si la conclusión es muy larga, 
+    // pero para frases cortas text() está bien.
+    doc.text(conclusion, 16, finalY + 28);
+
+    // 4. GUARDAR EL ARCHIVO
+    // Usamos el nombre del analista para el nombre del archivo, limpiando espacios
+    const nombreArchivo = `Reporte_SEAE_${nombreAnalista.replace(/ /g, "_")}.pdf`;
+    doc.save(nombreArchivo);
 }
 
 function exportarTXT() {
@@ -215,8 +273,14 @@ function exportarTXT() {
     
     const content = `REPORTE SEAE\nFECHA: ${new Date().toLocaleDateString()}\n${'-'.repeat(20)}\nALT A VPN: ${vpnA}\nALT B VPN: ${vpnB}\n${'-'.repeat(20)}\nCONCLUSIÓN: ${reco}`;
     
-    const blob = new Blob([content], {type: 'text/plain'});
-    forzarDescarga(blob, "Reporte_Simulacion.txt");
+    // Método tradicional para TXT en navegador
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+    element.setAttribute('download', "Reporte_Simulacion.txt");
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
 }
 // Actualización del Resumen Visual
 const vpnA = parseFloat(document.getElementById('res_vpn_a').innerText.replace(/[^0-9.-]+/g,""));
