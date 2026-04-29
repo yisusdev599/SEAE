@@ -550,47 +550,50 @@ function generarInputsFlujo(tipo) {
     const inputAnios = document.getElementById(`num_anios_${tipo}`);
     const alerta = document.getElementById('alerta-limite');
     const sonido = document.getElementById('audio-alert');
-    let cantidad = parseInt(inputAnios.value);
-
-    if (isNaN(cantidad) || cantidad < 1) {
-        contenedor.innerHTML = '';
-        return;
+    
+    // Si el input está vacío, no borramos los cuadros inmediatamente para que no "parpadee"
+    if (inputAnios.value === "") {
+        return; 
     }
 
+    let cantidad = parseInt(inputAnios.value);
+
+    // Si es un número menor a 1, lo forzamos a 1 para que siempre haya donde escribir
+    if (cantidad < 1) {
+        cantidad = 1;
+        inputAnios.value = 1;
+    }
+
+    // Validación de Máximo 30
     if (cantidad > 30) {
         cantidad = 30;
         inputAnios.value = 30;
         
-        // Efecto Visual
         inputAnios.classList.add('border-red-500', 'ring-2', 'ring-red-500/50');
-        
-        // Efecto Sonoro con manejo de error (Autoplay Policy)
         if (sonido) {
-            sonido.currentTime = 0; // Reinicia el sonido si ya estaba sonando
-            sonido.play().catch(error => {
-                console.log("El navegador bloqueó el sonido inicial. Haz clic en cualquier parte de la página primero.");
-            });
+            sonido.currentTime = 0;
+            sonido.play().catch(() => {});
         }
-        
-        // Mostrar Advertencia
-        alerta.classList.remove('hidden');
+        if (alerta) alerta.classList.remove('hidden');
         
         setTimeout(() => {
-            alerta.classList.add('hidden');
+            if (alerta) alerta.classList.add('hidden');
             inputAnios.classList.remove('border-red-500', 'ring-2', 'ring-red-500/50');
         }, 2500);
     }
 
-    // ... (resto de tu código para generar los inputs)
-    contenedor.innerHTML = '';
-    for (let i = 1; i <= cantidad; i++) {
-        const input = document.createElement('input');
-        input.type = 'number';
-        const focusCol = tipo === 'a' ? 'focus:border-primary-container' : 'focus:border-secondary';
-        input.className = `f_${tipo} w-full bg-neutral-950 border border-neutral-800 rounded text-[10px] p-2 text-center text-white outline-none transition-all ${focusCol}`;
-        input.placeholder = `${i}`;
-        input.value = 0;
-        contenedor.appendChild(input);
+    // Solo regeneramos si la cantidad de cuadros actuales es diferente a la solicitada
+    // Esto evita que se borre lo que ya escribiste en los cuadros si solo estás cambiando el número de años
+    if (contenedor.children.length !== cantidad) {
+        contenedor.innerHTML = '';
+        for (let i = 1; i <= cantidad; i++) {
+            const input = document.createElement('input');
+            input.type = 'number';
+            const focusCol = tipo === 'a' ? 'focus:border-primary-container' : 'focus:border-secondary';
+            input.className = `f_${tipo} w-full bg-neutral-950 border border-neutral-800 rounded text-[10px] p-2 text-center text-white outline-none transition-all ${focusCol}`;
+            input.placeholder = `${i}`;
+            contenedor.appendChild(input);
+        }
     }
 }
 // Ejecutar al cargar la página para que no aparezca vacío
