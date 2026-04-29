@@ -248,9 +248,6 @@ function borrarTodoElHistorial() {
 }
 
 
-// --- 3. EXPORTACIONES (VERSIÓN COMPATIBLE CON ESCRITORIO) ---
-
-
 
 /**
 
@@ -550,23 +547,52 @@ window.onload = function() {
 
 function generarInputsFlujo(tipo) {
     const contenedor = document.getElementById(`contenedor_f_${tipo}`);
-    const cantidad = document.getElementById(`num_anios_${tipo}`).value;
-    
-    // Limpiamos el contenido previo
-    contenedor.innerHTML = '';
+    const inputAnios = document.getElementById(`num_anios_${tipo}`);
+    const alerta = document.getElementById('alerta-limite');
+    const sonido = document.getElementById('audio-alert');
+    let cantidad = parseInt(inputAnios.value);
 
+    if (isNaN(cantidad) || cantidad < 1) {
+        contenedor.innerHTML = '';
+        return;
+    }
+
+    if (cantidad > 30) {
+        cantidad = 30;
+        inputAnios.value = 30;
+        
+        // Efecto Visual
+        inputAnios.classList.add('border-red-500', 'ring-2', 'ring-red-500/50');
+        
+        // Efecto Sonoro con manejo de error (Autoplay Policy)
+        if (sonido) {
+            sonido.currentTime = 0; // Reinicia el sonido si ya estaba sonando
+            sonido.play().catch(error => {
+                console.log("El navegador bloqueó el sonido inicial. Haz clic en cualquier parte de la página primero.");
+            });
+        }
+        
+        // Mostrar Advertencia
+        alerta.classList.remove('hidden');
+        
+        setTimeout(() => {
+            alerta.classList.add('hidden');
+            inputAnios.classList.remove('border-red-500', 'ring-2', 'ring-red-500/50');
+        }, 2500);
+    }
+
+    // ... (resto de tu código para generar los inputs)
+    contenedor.innerHTML = '';
     for (let i = 1; i <= cantidad; i++) {
         const input = document.createElement('input');
         input.type = 'number';
-        // Mantenemos clases originales para no romper el estilo
-        input.className = `f_${tipo} w-full bg-neutral-950 border border-neutral-800 rounded text-xs p-2 text-center text-white focus:border-blue-500 outline-none transition-colors`;
-        input.placeholder = `Año ${i}`;
-      
-        
+        const focusCol = tipo === 'a' ? 'focus:border-primary-container' : 'focus:border-secondary';
+        input.className = `f_${tipo} w-full bg-neutral-950 border border-neutral-800 rounded text-[10px] p-2 text-center text-white outline-none transition-all ${focusCol}`;
+        input.placeholder = `${i}`;
+        input.value = 0;
         contenedor.appendChild(input);
     }
 }
-
 // Ejecutar al cargar la página para que no aparezca vacío
 window.onload = () => {
     generarInputsFlujo('a');

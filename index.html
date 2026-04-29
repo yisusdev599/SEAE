@@ -111,7 +111,7 @@
                             <label class="block text-[10px] font-bold text-neutral-500 uppercase italic">Flujos de Efectivo</label>
                             <div class="flex items-center gap-2 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">
                                 <span class="text-[10px] text-neutral-500 font-bold">AÑOS:</span>
-                                <input type="number" id="num_anios_a" min="1" max="20" value="5" oninput="generarInputsFlujo('a')" class="w-10 bg-transparent border-none text-xs p-0 text-center text-blue-400 font-bold focus:ring-0">
+                                <input type="number" id="num_anios_a" min="1" max="30" value="5" oninput="generarInputsFlujo('a')" class="w-10 bg-transparent border-none text-xs p-0 text-center text-blue-400 font-bold focus:ring-0">
                             </div>
                         </div>
                         <div id="contenedor_f_a" class="grid grid-cols-5 gap-2"></div>
@@ -140,7 +140,7 @@
                             <label class="block text-[10px] font-bold text-neutral-500 uppercase italic text-neutral-400">Flujos de Efectivo</label>
                             <div class="flex items-center gap-2 bg-neutral-900 px-2 py-1 rounded-md border border-neutral-800">
                                 <span class="text-[10px] text-neutral-500 font-bold">AÑOS:</span>
-                                <input type="number" id="num_anios_b" min="1" max="20" value="5" oninput="generarInputsFlujo('b')" class="w-10 bg-transparent border-none text-xs p-0 text-center text-secondary font-bold focus:ring-0">
+                                <input type="number" id="num_anios_b" min="1" max="30" value="5" oninput="generarInputsFlujo('b')" class="w-10 bg-transparent border-none text-xs p-0 text-center text-secondary font-bold focus:ring-0">
                             </div>
                         </div>
                         <div id="contenedor_f_b" class="grid grid-cols-5 gap-2 transition-all"></div>
@@ -148,6 +148,19 @@
                 </div>
             </div>
         </div>
+
+        <div id="alerta-limite" class="fixed top-10 left-1/2 -translate-x-1/2 z-[200] hidden">
+    <div class="bg-red-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce">
+        <span class="material-symbols-outlined">warning</span>
+        <span class="text-sm font-bold">Límite máximo alcanzado: 30 años</span>
+    </div>
+
+    <audio id="audio-alert" preload="auto">
+    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    <source src="https://www.soundjay.com/buttons/sounds/button-10.mp3" type="audio/mpeg">
+</audio>
+
+</div>
 
         <section class="space-y-6">
             <h3 class="text-white font-bold text-lg">Cálculos Económicos Realizados</h3>
