@@ -526,24 +526,32 @@ function exportarTXT() {
 // --- 4. LIMPIEZA Y UTILIDADES ---
 
 function limpiarPantalla() {
-    document.querySelectorAll('input').forEach(input => input.value = '');
-    const resultados = ['res_vpn_a', 'res_vpn_b', 'res_cae_a', 'res_cae_b', 'res_tir_a', 'res_tir_b'];
-    resultados.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerText = id.includes('tir') ? '0.00%' : '$0.00';
-    });
+    // 1. Limpiamos los inputs de texto/número principales
+    document.getElementById('inv_a').value = '';
+    document.getElementById('inv_b').value = '';
+    document.getElementById('tasa_a').value = '';
+    document.getElementById('tasa_b').value = '';
+    
+    // 2. Reseteamos los años a vacío o a un estado inicial
+    document.getElementById('num_anios_a').value = '';
+    document.getElementById('num_anios_b').value = '';
+
+    // 3. ¡IMPORTANTE! Vaciamos los contenedores de los cuadros manualmente
+    document.getElementById('contenedor_f_a').innerHTML = '';
+    document.getElementById('contenedor_f_b').innerHTML = '';
+
+    // 4. Limpiamos los resultados de los cálculos
+    document.getElementById('res_vpn_a').innerText = '$0.00';
+    document.getElementById('res_vpn_b').innerText = '$0.00';
+    document.getElementById('res_cae_a').innerText = '$0.00';
+    document.getElementById('res_cae_b').innerText = '$0.00';
+    document.getElementById('res_mejor_cae').innerText = '-';
+    document.getElementById('recomendacion_txt').innerText = 'Ejecute los cálculos para ver la recomendación...';
+
+    // 5. Opcional: Si tienes barras de gráfico, bájalas a 0%
     document.getElementById('bar_a').style.height = '0%';
     document.getElementById('bar_b').style.height = '0%';
-    document.getElementById('res_mejor_cae').innerText = 'Indiferente';
-    document.getElementById('recomendacion_txt').innerText = 'Esperando nuevos datos...';
-    document.getElementById('estado_sistema').innerHTML = 'SISTEMA LISTO';
-    document.getElementById('estado_sistema').className = "text-xs font-bold text-neutral-500 flex items-center gap-1";
 }
-
-window.onload = function() {
-    limpiarPantalla();
-    renderizarHistorialCompleto();
-};
 
 function generarInputsFlujo(tipo) {
     const contenedor = document.getElementById(`contenedor_f_${tipo}`);
