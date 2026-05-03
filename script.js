@@ -33,11 +33,24 @@ function calcularTIR(inversion, flujos) {
             vpn += f / Math.pow(1 + tir, p);
             dVpn -= (p * f) / Math.pow(1 + tir, p + 1);
         });
+        if (dVpn === 0) return NaN; // Evita división por cero
         let nuevaTir = tir - vpn / dVpn;
         if (Math.abs(nuevaTir - tir) < precision) return nuevaTir * 100;
         tir = nuevaTir;
     }
-    return 0;
+    // No convergió → retorna NaN en vez de 0 para no dar un resultado falso
+    return NaN;
+}
+
+// Detecta si los flujos cambian de signo más de una vez (TIR múltiple posible)
+function tieneCambiosDeSignoMultiples(flujos) {
+    let cambios = 0;
+    for (let i = 1; i < flujos.length; i++) {
+        if ((flujos[i] >= 0 && flujos[i - 1] < 0) || (flujos[i] < 0 && flujos[i - 1] >= 0)) {
+            cambios++;
+        }
+    }
+    return cambios > 1;
 }
 
 // --- 2. FUNCIÓN DE CONTROLADOR (EJECUCIÓN) ---
@@ -59,6 +72,20 @@ function ejecutarSimulacion() {
         const tasaB = parseFloat(document.getElementById('tasa_b').value) || 0;
         const flujosB = Array.from(document.querySelectorAll('.f_b')).map(el => parseFloat(el.value) || 0);
 
+        // --- VALIDACIÓN DE TASAS ---
+        if (tasaA < 0 || tasaA > 100) {
+            alert("⚠️ La tasa de la Alternativa A debe estar entre 0% y 100%.");
+            estadoNodo.innerHTML = 'SISTEMA LISTO';
+            estadoNodo.classList.replace('text-blue-500', 'text-neutral-500');
+            return;
+        }
+        if (tasaB < 0 || tasaB > 100) {
+            alert("⚠️ La tasa de la Alternativa B debe estar entre 0% y 100%.");
+            estadoNodo.innerHTML = 'SISTEMA LISTO';
+            estadoNodo.classList.replace('text-blue-500', 'text-neutral-500');
+            return;
+        }
+
         // Cálculos
         const vpnA = calcularVPN(invA, tasaA, flujosA);
         const vpnB = calcularVPN(invB, tasaB, flujosB);
@@ -67,13 +94,30 @@ function ejecutarSimulacion() {
         const caeA = calcularCAE(vpnA, tasaA, n);
         const caeB = calcularCAE(vpnB, tasaB, n);
 
+        // --- CÁLCULO DE TIR CON MANEJO DE NaN ---
+        const tirA = calcularTIR(invA, flujosA);
+        const tirB = calcularTIR(invB, flujosB);
+
+        const formatearTIR = (tir) => isNaN(tir) ? "No calculable" : `${tir.toFixed(2)}%`;
+
         // Actualización de Interfaz
-        document.getElementById('res_vpn_a').innerText = `$${vpnA.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('res_vpn_b').innerText = `$${vpnB.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('res_vpn_a').innerText = `$${vpnA.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        document.getElementById('res_vpn_b').innerText = `$${vpnB.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         document.getElementById('res_cae_a').innerText = `$${caeA.toLocaleString(undefined, {maximumFractionDigits: 2})}`;
         document.getElementById('res_cae_b').innerText = `$${caeB.toLocaleString(undefined, {maximumFractionDigits: 2})}`;
-        document.getElementById('res_tir_a').innerText = `${calcularTIR(invA, flujosA).toFixed(2)}%`;
-        document.getElementById('res_tir_b').innerText = `${calcularTIR(invB, flujosB).toFixed(2)}%`;
+        document.getElementById('res_tir_a').innerText = formatearTIR(tirA);
+        document.getElementById('res_tir_b').innerText = formatearTIR(tirB);
+
+        // --- ADVERTENCIA DE TIR MÚLTIPLE ---
+        const advertenciaTIR = document.getElementById('advertencia_tir');
+        if (advertenciaTIR) {
+            const hayTirMultiple = tieneCambiosDeSignoMultiples(flujosA) || tieneCambiosDeSignoMultiples(flujosB);
+            if (hayTirMultiple) {
+                advertenciaTIR.classList.remove('hidden');
+            } else {
+                advertenciaTIR.classList.add('hidden');
+            }
+        }
 
         // Determinación de Mejor Opción
         const mejorCaeElement = document.getElementById('res_mejor_cae');
@@ -117,7 +161,6 @@ function ejecutarSimulacion() {
 // --- 3. SISTEMA DE HISTORIAL (FUERA PARA ALCANCE GLOBAL) ---
 
 function guardarEnHistorial() {
-    // Captura de datos de entrada (Inputs)
     const invA = document.getElementById('inv_a').value || "0";
     const tasaA = document.getElementById('tasa_a').value || "0";
     const flujosA = Array.from(document.querySelectorAll('.f_a')).map(el => el.value || "0").join(", ");
@@ -128,10 +171,8 @@ function guardarEnHistorial() {
 
     const datos = {
         fecha: new Date().toLocaleString('es-SV', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
-        // Entradas
         invA, tasaA, flujosA,
         invB, tasaB, flujosB,
-        // Resultados
         vpnA: document.getElementById('res_vpn_a').innerText,
         vpnB: document.getElementById('res_vpn_b').innerText,
         caeA: document.getElementById('res_cae_a').innerText,
@@ -247,310 +288,375 @@ function borrarTodoElHistorial() {
     }
 }
 
+/**
+ * Genera una conclusión detallada y profesional basada en los resultados calculados
+ */
+function generarConclusion() {
+    const ganador   = document.getElementById('res_mejor_cae')?.innerText || "N/A";
+    const vpnA      = document.getElementById('res_vpn_a')?.innerText || "$0.00";
+    const vpnB      = document.getElementById('res_vpn_b')?.innerText || "$0.00";
+    const caeA      = document.getElementById('res_cae_a')?.innerText || "$0.00";
+    const caeB      = document.getElementById('res_cae_b')?.innerText || "$0.00";
+    const tirA      = document.getElementById('res_tir_a')?.innerText || "0.00%";
+    const tirB      = document.getElementById('res_tir_b')?.innerText || "0.00%";
+    const tasaA     = document.getElementById('tasa_a')?.value || "0";
+    const tasaB     = document.getElementById('tasa_b')?.value || "0";
 
+    const altGanadora = ganador.trim() === "Alternativa A" ? "Alternativa A" : ganador.trim() === "Alternativa B" ? "Alternativa B" : null;
+
+    if (!altGanadora) {
+        return "Ambas alternativas presentan indicadores equivalentes. Se recomienda evaluar factores cualitativos adicionales como riesgo operativo, liquidez y alineación estratégica antes de tomar una decisión.";
+    }
+
+    const vpnGanador  = altGanadora === "Alternativa A" ? vpnA : vpnB;
+    const vpnPerdedor = altGanadora === "Alternativa A" ? vpnB : vpnA;
+    const caeGanador  = altGanadora === "Alternativa A" ? caeA : caeB;
+    const tirGanador  = altGanadora === "Alternativa A" ? tirA : tirB;
+    const tasaGanador = altGanadora === "Alternativa A" ? tasaA : tasaB;
+
+    return `Tras el análisis comparativo de ambas alternativas, se recomienda seleccionar la ${altGanadora}. ` +
+           `Esta opción presenta el Valor Presente Neto más favorable (${vpnGanador}) frente a ${vpnPerdedor} de la alternativa contraria, ` +
+           `un Costo/Beneficio Anual Equivalente (CAE) de ${caeGanador} y una Tasa Interna de Retorno (TIR) de ${tirGanador}, ` +
+           `evaluada a una tasa de descuento del ${tasaGanador}%. ` +
+           `Desde el punto de vista financiero, la ${altGanadora} representa la decisión de inversión más eficiente según los criterios de VPN y CAE aplicados.`;
+}
 
 /**
-
  * Función auxiliar para forzar la descarga en entornos restringidos
-
  */
-
 function forzarDescarga(blob, nombreArchivo) {
-
     const url = window.URL.createObjectURL(blob);
-
     const a = document.createElement('a');
-
     a.style.display = 'none';
-
     a.href = url;
-
     a.download = nombreArchivo;
-
-   
-
-    // Es vital agregar el elemento al DOM para que Nativefier lo reconozca
-
     document.body.appendChild(a);
-
     a.click();
-
-   
-
-    // Limpieza
-
     setTimeout(() => {
-
         document.body.removeChild(a);
-
         window.URL.revokeObjectURL(url);
-
     }, 100);
-
 }
-
-
 
 function exportarExcel() {
+    const estiloCabecera = {
+        fill: { fgColor: { rgb: "1C2027" } },
+        font: { color: { rgb: "FFFFFF" }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: { 
+            top: { style: "thin" }, 
+            bottom: { style: "thin" }, 
+            left: { style: "thin" }, 
+            right: { style: "thin" } 
+        }
+    };
+
+    const estiloSubtitulo = { font: { bold: true, sz: 12 } };
+    const formatoMoneda = '_-$* #,##0.00_-;-$* #,##0.00_-;_-$* "-"??_-;_-@_-';
+
+    const getNum = (id) => {
+        const el = document.getElementById(id);
+        if (!el) return 0;
+        let valor = (el.tagName === 'INPUT') ? el.value : el.innerText;
+        return parseFloat(valor.replace(/[^\d.-]/g, '')) || 0;
+    };
+
+    const celdaMoneda = (val) => ({ 
+        v: val, t: 'n', z: formatoMoneda, 
+        s: { alignment: { horizontal: "right" } } 
+    });
+
+    const obtenerFlujosExcel = (tipo) => {
+        const contenedor = document.getElementById(`contenedor_f_${tipo}`);
+        if (!contenedor) return [];
+        return Array.from(contenedor.querySelectorAll('input')).map(i => parseFloat(i.value) || 0);
+    };
+
+    const vpnA = getNum('res_vpn_a');
+    const vpnB = getNum('res_vpn_b');
+    const caeA = getNum('res_cae_a');
+    const caeB = getNum('res_cae_b');
+    const invA = getNum('inv_a'); 
+    const invB = getNum('inv_b');
+    const flujosA = obtenerFlujosExcel('a');
+    const flujosB = obtenerFlujosExcel('b');
+    const maxPeriodos = Math.max(flujosA.length, flujosB.length);
+    
+    const ganador = document.getElementById('res_mejor_cae')?.innerText || "Alternativa A";
+    const detalleTexto = generarConclusion();
+
+    const tasaA = document.getElementById('tasa_a')?.value || "0";
+    const tasaB = document.getElementById('tasa_b')?.value || "0";
 
     const data = [
-
-        ["REPORTE SEAE - SISTEMA DE EVALUACIÓN ECONÓMICA"],
-
-        ["Fecha:", new Date().toLocaleDateString()],
-
+        [{ v: "REPORTE SISTEMA DE EVALUACIÓN ECONÓMICA (SEAE)", s: { font: { bold: true, sz: 14 } } }],
+        ["Fecha de emisión:", new Date().toLocaleString()],
         [],
-
-        ["Métrica", "Alternativa A", "Alternativa B"],
-
-        ["VPN", document.getElementById('res_vpn_a').innerText, document.getElementById('res_vpn_b').innerText],
-
-        ["CAE", document.getElementById('res_cae_a').innerText, document.getElementById('res_cae_b').innerText],
-
-        ["TIR", document.getElementById('res_tir_a').innerText, document.getElementById('res_tir_b').innerText]
-
+        [
+            { v: "INDICADORES CLAVE", s: estiloCabecera }, 
+            { v: "ALTERNATIVA A", s: estiloCabecera }, 
+            { v: "ALTERNATIVA B", s: estiloCabecera }, 
+            { v: "DIFERENCIA", s: estiloCabecera }
+        ],
+        ["Tasa de Descuento (%)",
+            { v: `${tasaA}%`, s: { alignment: { horizontal: "right" } } },
+            { v: `${tasaB}%`, s: { alignment: { horizontal: "right" } } },
+            ""
+        ],
+        ["Valor Presente Neto (VPN)", celdaMoneda(vpnA), celdaMoneda(vpnB), celdaMoneda(Math.abs(vpnA - vpnB))],
+        ["Costo Anual Equivalente (CAE)", celdaMoneda(caeA), celdaMoneda(caeB), celdaMoneda(Math.abs(caeA - caeB))],
+        ["Tasa Interna de Retorno (TIR)", 
+            { v: document.getElementById('res_tir_a')?.innerText || "0.00%", s: { alignment: { horizontal: "right" } } },
+            { v: document.getElementById('res_tir_b')?.innerText || "0.00%", s: { alignment: { horizontal: "right" } } }, 
+            ""
+        ],
+        [],
+        [{ v: "DESGLOSE DE FLUJOS POR PERIODO", s: estiloSubtitulo }],
+        ["Inversión Inicial (Año 0)", celdaMoneda(invA), celdaMoneda(invB), ""],
     ];
 
-   
+    for (let i = 0; i < maxPeriodos; i++) {
+        data.push([
+            `Flujo de Efectivo - Año ${i + 1}`,
+            flujosA[i] !== undefined ? celdaMoneda(flujosA[i]) : "",
+            flujosB[i] !== undefined ? celdaMoneda(flujosB[i]) : "",
+            ""
+        ]);
+    }
+
+    data.push(
+        [],
+        [{ v: "VEREDICTO ESTRATÉGICO", s: estiloSubtitulo }],
+        ["OPCIÓN PREFERENTE:", { v: ganador.toUpperCase(), s: { font: { bold: true, color: { rgb: "1F4E78" } } } }],
+        [],
+        [{ v: "CONCLUSIÓN DEL ANÁLISIS", s: { font: { bold: true, sz: 11 } } }]
+    );
+
+    // Partir la conclusión en líneas de ~90 caracteres para que se lea bien en Excel
+    const palabras = detalleTexto.split(' ');
+    let lineaActual = '';
+    const lineas = [];
+    palabras.forEach(palabra => {
+        if ((lineaActual + ' ' + palabra).trim().length > 90) {
+            lineas.push(lineaActual.trim());
+            lineaActual = palabra;
+        } else {
+            lineaActual = (lineaActual + ' ' + palabra).trim();
+        }
+    });
+    if (lineaActual) lineas.push(lineaActual.trim());
+
+    lineas.forEach(linea => {
+        data.push([{ v: linea, s: { font: { italic: true, color: { rgb: "444444" } } } }]);
+    });
 
     const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 95 }, { wch: 22 }, { wch: 22 }, { wch: 22 }]; 
 
     const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte SEAE");
 
-    XLSX.utils.book_append_sheet(wb, ws, "Resultados");
-
-   
-
-    // Volvemos al método directo de la librería
-
-    XLSX.writeFile(wb, "Reporte_Financiero_SEAE.xlsx");
-
+    XLSX.writeFile(wb, `Reporte_SEAE_Completo.xlsx`, { cellStyles: true });
 }
-
-
 
 function exportarPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // 1. OBTENCIÓN DE DATOS Y METADATOS
     const nombreAnalista = localStorage.getItem('usuarioSEAE') || "(Analista independiente)";
     const fechaEmision = new Date().toLocaleDateString('es-ES', { 
         year: 'numeric', month: 'long', day: 'numeric' 
     });
     
-    // Obtenemos los textos de los resultados (con validación de seguridad)
-    const getVal = (id) => document.getElementById(id)?.innerText || "$0.00";
-    const conclusion = document.getElementById('recomendacion_txt')?.innerText || "Sin conclusión disponible.";
+    const getVal = (id) => document.getElementById(id)?.innerText || "$ 0.00";
+    const getInp = (id) => document.getElementById(id)?.value || "0";
+    const conclusion = generarConclusion();
 
-   // --- CONFIGURACIÓN DE ESTILOS DE FUENTE ---
+    const extraerFlujos = (tipo) => {
+        const contenedor = document.getElementById(`contenedor_f_${tipo}`);
+        if (!contenedor) return [];
+        return Array.from(contenedor.querySelectorAll('input')).map(i => parseFloat(i.value) || 0);
+    };
 
-
-
-    doc.setFont("helvetica");
-
-
-
-    // === ENCABEZADO PRINCIPAL (SEAE) ===
-
-
-
-    doc.setFontSize(30);
-
-
-
-    doc.setTextColor(28, 32, 39); // Un gris muy oscuro, casi negro
-
-
+    const flujosA = extraerFlujos('a');
+    const flujosB = extraerFlujos('b');
+    const maxPeriodos = Math.max(flujosA.length, flujosB.length);
 
     doc.setFont("helvetica", "bold");
-
-
-
+    doc.setFontSize(30);
+    doc.setTextColor(28, 32, 39);
     doc.text("SEAE", 16, 25);
-
-
-
+    
     doc.setFontSize(10);
-
-
-
-    doc.setTextColor(110, 110, 110); // Gris para el subtítulo
-
-
-
+    doc.setTextColor(110, 110, 110);
     doc.setFont("helvetica", "normal");
-
-
-
     doc.text("Sistema de Evaluación de Alternativas Económicas", 16, 33);
-
-    // Línea divisoria horizontal gris claro
-
-
-
     doc.setDrawColor(210, 210, 210);
-
-
-
     doc.line(16, 38, 194, 38);
 
-    // === SECCIÓN DE METADATOS (Fecha y Analista) ===
-
-
-
     doc.setFontSize(10);
-
-
-
     doc.setTextColor(50, 50, 50);
-
-
-
     doc.setFont("helvetica", "bold");
-
-
-
-    doc.text("Fecha de emisión:", 16, 50);
-
-
-
-    doc.text("Analista:", 16, 56);
-
+    doc.text("Fecha de emisión:", 16, 48);
+    doc.text("Analista:", 16, 54);
     doc.setFont("helvetica", "normal");
+    doc.text(fechaEmision, 50, 48);
+    doc.text(nombreAnalista, 35, 54);
 
-
-
-    doc.text(fechaEmision, 50, 50);
-
-
-
-    doc.text(nombreAnalista, 35, 56);
-
-    // === TABLA DE RESULTADOS ===
     doc.autoTable({
-        startY: 75,
+        startY: 65,
         margin: { left: 16, right: 16 },
         head: [['Métrica de Evaluación', 'Alternativa A', 'Alternativa B']],
         body: [
+            ['Tasa de Descuento (%)', `${getInp('tasa_a')}%`, `${getInp('tasa_b')}%`],
             ['Valor Presente Neto (VPN)', getVal('res_vpn_a'), getVal('res_vpn_b')],
             ['Costo Anual Equivalente (CAE)', getVal('res_cae_a'), getVal('res_cae_b')],
             ['Tasa Interna de Retorno (TIR)', getVal('res_tir_a'), getVal('res_tir_b')]
         ],
-        theme: 'grid', // 'grid' se ve más técnico para ingeniería económica
-        headStyles: {
-            fillColor: [28, 32, 39],
-            textColor: [255, 255, 255],
-            fontSize: 10,
-            halign: 'center'
-        },
-        bodyStyles: {
-            fontSize: 9,
-            textColor: [40, 40, 40],
-            cellPadding: 4
-        },
-        columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 80 },
-            1: { halign: 'right' },
-            2: { halign: 'right' }
+        theme: 'grid',
+        headStyles: { fillColor: [28, 32, 39], halign: 'center' },
+        columnStyles: { 
+            0: { fontStyle: 'bold', cellWidth: 80 }, 
+            1: { halign: 'right' }, 
+            2: { halign: 'right' } 
         }
     });
 
-    // === SECCIÓN DE CONCLUSIÓN (Manejo de texto largo) ===
-    const finalY = doc.lastAutoTable.finalY + 15;
-    
+    const yFlujos = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(11);
-    doc.setTextColor(28, 32, 39);
     doc.setFont("helvetica", "bold");
-    doc.text("CONCLUSIÓN DEL ANÁLISIS", 16, finalY);
+    doc.setTextColor(28, 32, 39);
+    doc.text("DESGLOSE DE FLUJOS POR PERIODO", 16, yFlujos);
 
-    // Dibujamos una pequeña línea debajo del título de conclusión
-    doc.setDrawColor(200);
-    doc.line(16, finalY + 2, 194, finalY + 2);
+    const filasFlujos = [
+        ['Inversión Inicial (Año 0)', `$ ${parseFloat(getInp('inv_a')).toLocaleString()}`, `$ ${parseFloat(getInp('inv_b')).toLocaleString()}`]
+    ];
 
+    for (let i = 0; i < maxPeriodos; i++) {
+        filasFlujos.push([
+            `Flujo de Efectivo - Año ${i + 1}`,
+            flujosA[i] !== undefined ? `$ ${flujosA[i].toLocaleString()}` : "---",
+            flujosB[i] !== undefined ? `$ ${flujosB[i].toLocaleString()}` : "---"
+        ]);
+    }
+
+    doc.autoTable({
+        startY: yFlujos + 5,
+        margin: { left: 16, right: 16 },
+        head: [['Concepto', 'Alternativa A', 'Alternativa B']],
+        body: filasFlujos,
+        theme: 'striped',
+        headStyles: { fillColor: [220, 220, 220], textColor: [50, 50, 50], fontStyle: 'bold' },
+        columnStyles: { 
+            0: { cellWidth: 80 }, 
+            1: { halign: 'right' }, 
+            2: { halign: 'right' } 
+        }
+    });
+
+    const yConclu = doc.lastAutoTable.finalY + 15;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("CONCLUSIÓN DEL ANÁLISIS", 16, yConclu);
+    doc.line(16, yConclu + 2, 194, yConclu + 2);
+    
+    doc.setFont("helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(80);
-    doc.setFont("helvetica", "italic");
+    const splitText = doc.splitTextToSize(conclusion, 178);
+    doc.text(splitText, 16, yConclu + 10);
 
-    // Dividir el texto de la conclusión para que no se salga del ancho de la página (178mm)
-    const conclusionSplit = doc.splitTextToSize(conclusion, 178);
-    doc.text(conclusionSplit, 16, finalY + 10);
-
-    // === PIE DE PÁGINA ===
     const pageCount = doc.internal.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text(`Documento generado por SEAE - Página ${i} de ${pageCount}`, 16, 285);
+        doc.text(`SEAE - Documento Técnico - Página ${i} de ${pageCount}`, 16, 285);
     }
 
-    // 4. GUARDAR EL ARCHIVO
-    const sanitizedNombre = nombreAnalista.trim().replace(/\s+/g, '_');
-    doc.save(`Reporte_Financiero_SEAE_${sanitizedNombre}.pdf`);
+    doc.save(`Reporte_SEAE_${new Date().getTime()}.pdf`);
 }
 
+function exportarTexto() {
+    try {
+        const vpnA    = document.getElementById('res_vpn_a')?.innerText || "0.00";
+        const vpnB    = document.getElementById('res_vpn_b')?.innerText || "0.00";
+        const caeA    = document.getElementById('res_cae_a')?.innerText || "0.00";
+        const caeB    = document.getElementById('res_cae_b')?.innerText || "0.00";
+        const tirA    = document.getElementById('res_tir_a')?.innerText || "0.00%";
+        const tirB    = document.getElementById('res_tir_b')?.innerText || "0.00%";
+        const ganador = document.getElementById('res_mejor_cae')?.innerText || "N/A";
+        const invA    = document.getElementById('inv_a')?.value || "0";
+        const invB    = document.getElementById('inv_b')?.value || "0";
+        const tasaA   = document.getElementById('tasa_a')?.value || "0";
+        const tasaB   = document.getElementById('tasa_b')?.value || "0";
+        const flujosA = Array.from(document.querySelectorAll('.f_a')).map(el => `$${el.value || "0"}`).join(", ");
+        const flujosB = Array.from(document.querySelectorAll('.f_b')).map(el => `$${el.value || "0"}`).join(", ");
+        const conclusion = generarConclusion();
+        const fecha   = new Date().toLocaleString('es-SV');
 
-function exportarTXT() {
+        const contenido = [
+            "=========================================",
+            "   REPORTE DE EVALUACIÓN FINANCIERA SEAE  ",
+            "=========================================",
+            `Fecha de emisión : ${fecha}`,
+            `Analista         : ${localStorage.getItem('usuarioSEAE') || "(Analista independiente)"}`,
+            "",
+            "-----------------------------------------",
+            "  PARÁMETROS DE ENTRADA",
+            "-----------------------------------------",
+            `Alternativa A -> Inversión: $${invA} | Tasa de descuento: ${tasaA}% | Flujos: ${flujosA}`,
+            `Alternativa B -> Inversión: $${invB} | Tasa de descuento: ${tasaB}% | Flujos: ${flujosB}`,
+            "",
+            "-----------------------------------------",
+            "  INDICADORES CALCULADOS",
+            "-----------------------------------------",
+            `Alternativa A -> Tasa: ${tasaA}% | VPN: ${vpnA} | CAE: ${caeA} | TIR: ${tirA}`,
+            `Alternativa B -> Tasa: ${tasaB}% | VPN: ${vpnB} | CAE: ${caeB} | TIR: ${tirB}`,
+            "",
+            "-----------------------------------------",
+            "  VEREDICTO",
+            "-----------------------------------------",
+            `Mejor opción: ${ganador}`,
+            "",
+            "-----------------------------------------",
+            "  CONCLUSIÓN DEL ANÁLISIS",
+            "-----------------------------------------",
+            conclusion,
+            "",
+            "========================================="
+        ].join("\n");
 
-    const vpnA = document.getElementById('res_vpn_a').innerText;
+        const blob = new Blob([contenido], { type: 'text/plain' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Reporte_SEAE_${ganador.replace(/\s+/g, '_')}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
 
-    const vpnB = document.getElementById('res_vpn_b').innerText;
-
-    const reco = document.getElementById('recomendacion_txt').innerText;
-
-   
-
-    const content = `REPORTE SEAE\nFECHA: ${new Date().toLocaleDateString()}\n${'-'.repeat(20)}\nALT A VPN: ${vpnA}\nALT B VPN: ${vpnB}\n${'-'.repeat(20)}\nCONCLUSIÓN: ${reco}`;
-
-   
-
-    // Método tradicional para TXT en navegador
-
-    const element = document.createElement('a');
-
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
-
-    element.setAttribute('download', "Reporte_Simulacion.txt");
-
-    element.style.display = 'none';
-
-    document.body.appendChild(element);
-
-    element.click();
-
-    document.body.removeChild(element);
-
+    } catch (error) {
+        console.error("Error al exportar TXT:", error);
+        alert("Primero debes realizar el cálculo para generar el reporte.");
+    }
 }
 
 // --- 4. LIMPIEZA Y UTILIDADES ---
 
 function limpiarPantalla() {
-    // 1. Limpiamos los inputs de texto/número principales
-    document.getElementById('inv_a').value = '';
-    document.getElementById('inv_b').value = '';
-    document.getElementById('tasa_a').value = '';
-    document.getElementById('tasa_b').value = '';
-    
-    // 2. Reseteamos los años a vacío o a un estado inicial
-    document.getElementById('num_anios_a').value = '';
-    document.getElementById('num_anios_b').value = '';
-
-    // 3. ¡IMPORTANTE! Vaciamos los contenedores de los cuadros manualmente
-    document.getElementById('contenedor_f_a').innerHTML = '';
-    document.getElementById('contenedor_f_b').innerHTML = '';
-
-    // 4. Limpiamos los resultados de los cálculos
-    document.getElementById('res_vpn_a').innerText = '$0.00';
-    document.getElementById('res_vpn_b').innerText = '$0.00';
-    document.getElementById('res_cae_a').innerText = '$0.00';
-    document.getElementById('res_cae_b').innerText = '$0.00';
-    document.getElementById('res_mejor_cae').innerText = '-';
-    document.getElementById('recomendacion_txt').innerText = 'Ejecute los cálculos para ver la recomendación...';
-
-    // 5. Opcional: Si tienes barras de gráfico, bájalas a 0%
+    document.querySelectorAll('input').forEach(input => input.value = '');
+    const resultados = ['res_vpn_a', 'res_vpn_b', 'res_cae_a', 'res_cae_b', 'res_tir_a', 'res_tir_b'];
+    resultados.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = id.includes('tir') ? '0.00%' : '$0.00';
+    });
     document.getElementById('bar_a').style.height = '0%';
     document.getElementById('bar_b').style.height = '0%';
+    document.getElementById('res_mejor_cae').innerText = 'Indiferente';
+    document.getElementById('recomendacion_txt').innerText = 'Esperando nuevos datos...';
+    document.getElementById('estado_sistema').innerHTML = 'SISTEMA LISTO';
+    document.getElementById('estado_sistema').className = "text-xs font-bold text-neutral-500 flex items-center gap-1";
 }
 
 function generarInputsFlujo(tipo) {
@@ -559,20 +665,17 @@ function generarInputsFlujo(tipo) {
     const alerta = document.getElementById('alerta-limite');
     const sonido = document.getElementById('audio-alert');
     
-    // Si el input está vacío, no borramos los cuadros inmediatamente para que no "parpadee"
     if (inputAnios.value === "") {
         return; 
     }
 
     let cantidad = parseInt(inputAnios.value);
 
-    // Si es un número menor a 1, lo forzamos a 1 para que siempre haya donde escribir
     if (cantidad < 1) {
         cantidad = 1;
         inputAnios.value = 1;
     }
 
-    // Validación de Máximo 30
     if (cantidad > 30) {
         cantidad = 30;
         inputAnios.value = 30;
@@ -590,8 +693,6 @@ function generarInputsFlujo(tipo) {
         }, 2500);
     }
 
-    // Solo regeneramos si la cantidad de cuadros actuales es diferente a la solicitada
-    // Esto evita que se borre lo que ya escribiste en los cuadros si solo estás cambiando el número de años
     if (contenedor.children.length !== cantidad) {
         contenedor.innerHTML = '';
         for (let i = 1; i <= cantidad; i++) {
@@ -604,18 +705,17 @@ function generarInputsFlujo(tipo) {
         }
     }
 }
-// Ejecutar al cargar la página para que no aparezca vacío
-window.onload = () => {
-    generarInputsFlujo('a');
-    generarInputsFlujo('b'); // Si tienes alternativa B
-};
 
+// FIX: Función auxiliar global para obtener flujos (sin conflicto de redeclaración)
 function obtenerFlujos(tipo) {
     const inputs = document.querySelectorAll(`.f_${tipo}`);
-    // Convertimos la lista de inputs en un Array de números
     return Array.from(inputs).map(input => parseFloat(input.value) || 0);
 }
 
-// Ejemplo de uso en tu lógica de cálculo:
-const flujosA = obtenerFlujos('a'); 
-// flujosA ahora es [45000, 48500, ...] dependiendo de cuántos años puso el usuario.
+// Un único listener de carga que une todo lo necesario al inicio
+window.addEventListener('load', function() {
+    limpiarPantalla();
+    renderizarHistorialCompleto();
+    generarInputsFlujo('a');
+    generarInputsFlujo('b');
+});
